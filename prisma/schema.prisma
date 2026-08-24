@@ -1,0 +1,105 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+}
+
+model TrackedWallet {
+  id                        String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  walletAddress             String    @unique @map("wallet_address")
+  label                     String?
+  trackingEnabled           Boolean   @default(true) @map("tracking_enabled")
+  historicalScanStatus      String    @default("PENDING") @map("historical_scan_status")
+  historicalScanStartedAt   DateTime? @map("historical_scan_started_at") @db.Timestamptz(6)
+  historicalScanCompletedAt DateTime? @map("historical_scan_completed_at") @db.Timestamptz(6)
+  oldestIndexedSlot         BigInt?   @map("oldest_indexed_slot")
+  lastIndexedSlot           BigInt?   @map("last_indexed_slot")
+  createdAt                 DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                 DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@map("tracked_wallets")
+}
+
+model WalletPosition {
+  id                 String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  walletAddress      String    @map("wallet_address")
+  mint               String
+  positionNumber     Int       @map("position_number")
+  status             String
+  firstEntryAt       DateTime? @map("first_entry_at") @db.Timestamptz(6)
+  lastActivityAt     DateTime? @map("last_activity_at") @db.Timestamptz(6)
+  closedAt           DateTime? @map("closed_at") @db.Timestamptz(6)
+  
+  totalTokensBought  Decimal?  @map("total_tokens_bought") @db.Decimal
+  totalTokensSold    Decimal?  @map("total_tokens_sold") @db.Decimal
+  remainingTokens    Decimal?  @map("remaining_tokens") @db.Decimal
+  
+  totalSolSpent      Decimal?  @map("total_sol_spent") @db.Decimal
+  totalSolReceived   Decimal?  @map("total_sol_received") @db.Decimal
+  
+  averageEntrySol    Decimal?  @map("average_entry_sol") @db.Decimal
+  averageExitSol     Decimal?  @map("average_exit_sol") @db.Decimal
+  
+  realizedPnlSol     Decimal?  @map("realized_pnl_sol") @db.Decimal
+  unrealizedPnlSol   Decimal?  @map("unrealized_pnl_sol") @db.Decimal
+  
+  entryMarketCap     Decimal?  @map("entry_market_cap") @db.Decimal
+  currentMarketCap   Decimal?  @map("current_market_cap") @db.Decimal
+  peakMarketCap      Decimal?  @map("peak_market_cap") @db.Decimal
+  exitMarketCap      Decimal?  @map("exit_market_cap") @db.Decimal
+  
+  maxDrawdownPct     Decimal?  @map("max_drawdown_pct") @db.Decimal
+  peakUnrealizedPct  Decimal?  @map("peak_unrealized_pct") @db.Decimal
+  
+  dataQuality        String?   @map("data_quality")
+  
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  events             PositionEvent[]
+
+  @@unique([walletAddress, mint, positionNumber])
+  @@index([walletAddress])
+  @@map("wallet_positions")
+}
+
+model PositionEvent {
+  id                 String         @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  positionId         String?        @map("position_id") @db.Uuid
+  signature          String
+  slot               BigInt
+  timestamp          DateTime       @db.Timestamptz(6)
+  eventType          String         @map("event_type") // 'BUY' | 'SELL'
+  
+  tokenAmount        Decimal        @map("token_amount") @db.Decimal
+  quoteMint          String         @map("quote_mint")
+  quoteSymbol        String         @map("quote_symbol")
+  quoteAmount        Decimal        @map("quote_amount") @db.Decimal
+  
+  executionPriceSol  Decimal?       @map("execution_price_sol") @db.Decimal
+  executionPriceUsd  Decimal?       @map("execution_price_usd") @db.Decimal
+  executionMarketCap Decimal?       @map("execution_market_cap") @db.Decimal
+  executionQuality   String?        @map("execution_quality") // 'EXACT' | 'DERIVED' | 'BAR_ESTIMATE'
+  
+  venue              String?
+  metadataJson       Json?          @map("metadata_json")
+  
+  createdAt          DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  position           WalletPosition? @relation(fields: [positionId], references: [id], onDelete: Cascade)
+
+  @@index([positionId])
+  @@index([signature])
+  @@map("position_events")
+}
+
+model PumpshotCache {
+  id        String   @id
+  payload   Json
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("pumpshot_cache")
+}
