@@ -130,8 +130,10 @@ async function swapRate(
   );
   const data = res?.data ?? [];
   if (data.length < 2) return { rate: 0, sample: data };
-  const span = (data[0]?.blockTime ?? 0) - (data[data.length - 1]?.blockTime ?? 0);
-  return { rate: span > 0 ? data.length / span : 0, sample: data };
+  const now = Math.floor(Date.now() / 1000);
+  const oldest = data[data.length - 1]?.blockTime ?? 0;
+  const span = Math.max(now - oldest, 1);
+  return { rate: data.length / span, sample: data };
 }
 
 /**
