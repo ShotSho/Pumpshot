@@ -48,6 +48,7 @@ export function HistoryReplay({
     null,
   );
   const [built, setBuilt] = useState<BuiltToken[]>(initialTokens);
+  const [injectedTraders, setInjectedTraders] = useState<HistoryTrader[]>([]);
 
   const load = useCallback(async function load(override?: string) {
     const target = (override ?? mint).trim();
@@ -57,6 +58,7 @@ export function HistoryReplay({
     setHistory(null);
     setBoard(null);
     setPlaying(null);
+    if (override) setInjectedTraders([]); // clear injected traders on new token
     try {
       const h = await fetchHistory(target, wallet.trim() || undefined);
       setHistory(h);
@@ -111,20 +113,25 @@ export function HistoryReplay({
     };
   }
 
+  // Inject currently searched trader into the injectedTraders list if not already there
+  if (searchedTrader && !injectedTraders.some((t) => t.wallet === searchedTrader!.wallet)) {
+    setInjectedTraders((prev) => [searchedTrader!, ...prev]);
+  }
+
   const baseTop = board?.top ?? [];
   const baseBottom = board?.bottom ?? [];
 
   let allTop = [...baseTop];
   let allBottom = [...baseBottom];
 
-  if (searchedTrader) {
-    const inTop = allTop.some(t => t.wallet === searchedTrader!.wallet);
-    const inBottom = allBottom.some(t => t.wallet === searchedTrader!.wallet);
+  for (const trader of injectedTraders) {
+    const inTop = allTop.some(t => t.wallet === trader.wallet);
+    const inBottom = allBottom.some(t => t.wallet === trader.wallet);
     if (!inTop && !inBottom) {
-      if (searchedTrader.total >= 0) {
-        allTop.unshift(searchedTrader);
+      if (trader.total >= 0) {
+        allTop.unshift(trader);
       } else {
-        allBottom.unshift(searchedTrader);
+        allBottom.unshift(trader);
       }
     }
   }
@@ -143,6 +150,7 @@ export function HistoryReplay({
     setPlaying(null);
     setQuery("");
     setWallet("");
+    setInjectedTraders([]);
   }
 
   return (
