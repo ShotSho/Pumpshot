@@ -532,9 +532,12 @@ function Board({
         </p>
       )}
       {!loading && rows.length === 0 && (
-        <p className="px-4 py-6 font-mono text-[11px] text-tx3">
-          no wallets with a known cost basis
-        </p>
+        <div className="px-4 py-6 font-mono text-[11px] text-tx3 flex flex-col gap-2">
+          <span>no wallets with a known cost basis</span>
+          <span className="text-amber/70">
+            Tip: You can manually input a specific wallet address in the "Wallet (optional)" form above to track its trades.
+          </span>
+        </div>
       )}
       <div className="max-h-[420px] overflow-y-auto">
       {rows.map((r, i) => (

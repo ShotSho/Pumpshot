@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useReducer } from "react";
+import React, { useState, useReducer } from "react";
 import type { WalletPosition, PositionEvent } from "@prisma/client";
 import { PositionCard } from "./PositionCard";
 import type { WalletStats } from "@/server/walletStats";
@@ -36,6 +36,30 @@ export function WalletTracker({
 
   // Setup Supabase Realtime
   useWalletRealtime({ walletAddress, dispatch });
+
+  // Phase C Enhancement: Ping all open position mints so the backend keeps tracking their live prices
+  React.useEffect(() => {
+    const mintsToPing = Array.from(new Set(state.openPositions.map(p => p.mint)));
+    if (mintsToPing.length === 0) return;
+
+    const pingMints = async () => {
+      try {
+        await Promise.all(mintsToPing.map(mint => 
+          fetch('/api/market/ping', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mint })
+          })
+        ));
+      } catch (err) {
+        console.error('Failed to ping mints', err);
+      }
+    };
+
+    pingMints();
+    const interval = setInterval(pingMints, 30000); // every 30s
+    return () => clearInterval(interval);
+  }, [state.openPositions]);
 
   const tabs: Tab[] = ["OVERVIEW", "OPEN", "CLOSED", "ACTIVITY"];
 
