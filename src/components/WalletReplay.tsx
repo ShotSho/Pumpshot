@@ -1270,9 +1270,9 @@ export function WalletReplay({
                 ? `Play it through and save the chart as ${container.ext.toUpperCase()}`
                 : "This browser cannot record video"
             }
-            className="cursor-pointer rounded-xs border border-mint/40 bg-mint/10 px-2.5 py-1.5 font-mono text-[10px] tracking-[0.1em] text-mint uppercase disabled:opacity-40"
+            className="cursor-pointer border border-[#00ff00] bg-black px-3 py-2 font-mono text-[12px] font-bold tracking-[0.1em] text-[#00ff00] uppercase hover:bg-[#00ff00]/10 transition-colors disabled:opacity-40"
           >
-            {clipping !== null ? "recording…" : "export clip"}
+            {clipping !== null ? "[ RECORDING... ]" : "[ SHARE SHOT ]"}
           </button>
           <div className="flex gap-1">
             {(["candles", "line"] as Mode[]).map((m) => (

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { WalletPosition } from "@prisma/client";
 
 export function PositionCard({ position }: { position: WalletPosition }) {
@@ -53,13 +54,19 @@ export function PositionCard({ position }: { position: WalletPosition }) {
         </div>
         <div>
           {isOpen ? (
-             <button className="border border-[#00ff00] text-[#00ff00] px-4 py-1 hover:bg-[#00ff00] hover:text-black transition-colors">
+             <Link 
+               href={`/wallet/${position.walletAddress}/${position.mint}`}
+               className="border border-[#00ff00] text-[#00ff00] px-4 py-1 hover:bg-[#00ff00] hover:text-black transition-colors"
+             >
                WATCH LIVE
-             </button>
+             </Link>
           ) : (
-             <button className="border border-zinc-600 text-zinc-300 px-4 py-1 hover:bg-zinc-800 transition-colors">
+             <Link 
+               href={`/wallet/${position.walletAddress}/${position.mint}`}
+               className="border border-zinc-600 text-zinc-300 px-4 py-1 hover:bg-zinc-800 transition-colors"
+             >
                REPLAY
-             </button>
+             </Link>
           )}
         </div>
       </div>

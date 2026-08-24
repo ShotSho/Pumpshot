@@ -48,3 +48,6 @@ next-env.d.ts
 .windsurf/
 .gemini/
 skills-lock.json
+
+# Test scripts
+scripts/
