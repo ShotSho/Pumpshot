@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { readOnly } from "@/server/config";
-import { indexed, reconstruct, replayFrom } from "@/server/history";
+import { indexed, reconstruct, replayFrom, patchTraderBoard } from "@/server/history";
 
 /**
  * Rebuild a token from the chain, and optionally one wallet's trades on it.
@@ -84,12 +84,42 @@ export async function GET(request: Request) {
       }
     }
 
+    const pointsToReturn = filteredPoints.length > 0 ? filteredPoints : undefined;
+
+    if (pointsToReturn && pointsToReturn.length > 0 && wallet) {
+      const lastPoint = pointsToReturn[pointsToReturn.length - 1];
+      const trades = replay?.trades ?? [];
+      const firstTrade = trades[0];
+      const lastTrade = trades[trades.length - 1];
+      let heldSec: number | undefined;
+      if (firstTrade && lastTrade) {
+         heldSec = lastPoint.qty > 0 ? Math.floor(Date.now() / 1000) - firstTrade.ts : lastTrade.ts - firstTrade.ts;
+      }
+      const trader = {
+        wallet: wallet,
+        name: history.walletName,
+        total: lastPoint.total,
+        realized: lastPoint.realized,
+        unrealized: lastPoint.unrealized,
+        boughtUsd: lastPoint.boughtUsd,
+        soldUsd: lastPoint.soldUsd,
+        trades: trades.length,
+        qty: lastPoint.qty,
+        heldSec: heldSec ?? 0,
+        avgBuyPrice: 0,
+        avgSellPrice: 0,
+        unknownBasis: false,
+        basisDrift: 0,
+      };
+      await patchTraderBoard(mint, trader as any).catch(() => {});
+    }
+
     return NextResponse.json({
       ...history,
       wallet,
       candles: filteredCandles,
       trades: replay?.trades ?? [],
-      points: filteredPoints.length > 0 ? filteredPoints : undefined,
+      points: pointsToReturn,
     });
   } catch (error) {
     return NextResponse.json(

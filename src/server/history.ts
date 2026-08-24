@@ -1838,3 +1838,31 @@ function worthShowing(report: RelatedReport): RelatedReport {
     linked: report.linked.filter((r) => Math.abs(r.total) >= 1 || r.qty > 0),
   };
 }
+
+export async function patchTraderBoard(mint: string, trader: PnlRow) {
+  const key = `board:${mint}`;
+  const stateKey = `boardstate:${mint}`;
+  const held = await loadBlob<TraderBoard>(key);
+  const state = await loadBlob<BoardState>(stateKey);
+
+  if (held) {
+    const isTop = trader.total >= 0;
+    const list = isTop ? held.top : held.bottom;
+    if (!list.some(t => t.wallet === trader.wallet)) {
+      list.unshift(trader);
+      // optionally sort and limit to 100? No, let's just keep it at top
+      await saveBlob(key, held);
+    }
+  }
+
+  if (state) {
+    if (!state.pinned) state.pinned = [];
+    if (!state.pinned.includes(trader.wallet)) {
+      state.pinned.push(trader.wallet);
+    }
+    if (!state.candidates.includes(trader.wallet)) {
+      state.candidates.push(trader.wallet);
+    }
+    await saveBlob(stateKey, state);
+  }
+}
