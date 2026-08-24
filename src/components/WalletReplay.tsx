@@ -4,11 +4,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   fetchHistory,
   fetchRelated,
+  liveEventToReplayTrade,
+  livePositionToReplayPoint,
   type RelatedReport,
   type Replay,
   type ReplayPoint,
   type TokenHistory,
 } from "@/lib/replay";
+import { useMintWalletRealtime } from "@/hooks/useMintWalletRealtime";
 import { usdCompact } from "@/lib/format";
 import { bestContainer, record, save } from "@/lib/record";
 import { captureTrack, play as playCue, prepare as prepareSound } from "@/lib/sound";
@@ -199,6 +202,50 @@ export function WalletReplay({
   onClose: () => void;
 }) {
   const [raw, setRaw] = useState<Replay | null>(null);
+
+  useMintWalletRealtime({
+    walletAddress: wallet,
+    mint,
+    onPositionEvent: (event) => {
+      setRaw(prev => {
+        if (!prev) return prev;
+        const newTrade = liveEventToReplayTrade(event);
+        return {
+          ...prev,
+          trades: [...prev.trades, newTrade],
+        };
+      });
+    },
+    onPositionUpdate: (position) => {
+      setRaw(prev => {
+        if (!prev || prev.candles.length === 0) return prev;
+        
+        // Find the current candle price for PnL calculation
+        const lastCandle = prev.candles[prev.candles.length - 1];
+        // Calculate current price: if raw is market cap, we need to handle that, but `livePositionToReplayPoint` assumes base price or marketcap.
+        // If the chart uses marketcap, the "price" field is the cap.
+        const currentPrice = lastCandle.c;
+        // Minute is the timestamp of the last candle divided by 60
+        const minute = Math.floor(lastCandle.t / 60);
+
+        const newPoint = livePositionToReplayPoint(position, currentPrice, minute);
+        
+        // Check if we need to update the last point or append
+        const points = [...prev.points];
+        if (points.length > 0 && points[points.length - 1].minute === minute) {
+          points[points.length - 1] = newPoint;
+        } else {
+          points.push(newPoint);
+        }
+        
+        return {
+          ...prev,
+          points
+        };
+      });
+    }
+  });
+
   const [zoom, setZoom] = useState<number>(1);
   /**
    * What the chart actually draws. `raw` is what the server sent; every bar

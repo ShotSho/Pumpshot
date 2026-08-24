@@ -234,3 +234,39 @@ export async function fetchRelated(
   if (!res.ok) return { ...body, error: body.error ?? `error ${res.status}` };
   return body;
 }
+
+// Converter for LIVE Realtime events (Phase B)
+export function liveEventToReplayTrade(event: any): ReplayTrade {
+  return {
+    ts: Math.floor(new Date(event.timestamp).getTime() / 1000),
+    isBuy: event.eventType === "BUY",
+    base: Number(event.tokenAmount),
+    usd: Number(event.quoteAmount), // Actually SOL in MVP
+    wallet: event.walletAddress,
+  };
+}
+
+export function livePositionToReplayPoint(pos: any, currentPrice: number, minute: number): ReplayPoint {
+  const remainingTokens = Number(pos.remainingTokens || 0);
+  const totalSolSpent = Number(pos.totalSolSpent || 0);
+  const totalSolReceived = Number(pos.totalSolReceived || 0);
+  const realized = Number(pos.realizedPnlSol || 0);
+
+  // Naive average entry cost for remaining position
+  const avgEntryCost = Number(pos.totalTokensBought || 0) > 0 
+    ? totalSolSpent / Number(pos.totalTokensBought) 
+    : 0;
+
+  const unrealized = (remainingTokens * currentPrice) - (remainingTokens * avgEntryCost);
+
+  return {
+    minute,
+    qty: remainingTokens,
+    price: currentPrice,
+    realized,
+    unrealized,
+    total: realized + unrealized,
+    boughtUsd: totalSolSpent,
+    soldUsd: totalSolReceived,
+  };
+}
