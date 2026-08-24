@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { fetchHistory } from "@/lib/replay";
+import { reconstruct } from "@/server/history";
 
 export const dynamic = "force-dynamic";
 
@@ -59,9 +59,8 @@ export async function POST(request: Request) {
           try {
             console.log(`[Webhook] Syncing ${wallet} on ${mint}`);
             // This will pull the latest tx from Helius and run syncPositionBook internally
-            // if we connected the dots correctly. Wait, does fetchHistory save to DB?
-            // According to Phase 2, we wrapped fetchHistory to call syncPositionBook.
-            await fetchHistory(mint, wallet, 100, []);
+            // Call reconstruct directly on the server side instead of the client-side fetch wrapper
+            await reconstruct(mint, wallet, 100, []);
           } catch (err) {
             console.error(`[Webhook] Failed to sync ${wallet} ${mint}:`, err);
           }
