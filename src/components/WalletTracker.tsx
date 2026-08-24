@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useReducer } from "react";
 import type { WalletPosition, PositionEvent } from "@prisma/client";
 import { PositionCard } from "./PositionCard";
 import type { WalletStats } from "@/server/walletStats";
+import { walletReducer } from "@/lib/realtime/walletReducer";
+import { useWalletRealtime } from "@/hooks/useWalletRealtime";
 
 type Tab = "OVERVIEW" | "OPEN" | "CLOSED" | "ACTIVITY";
 
@@ -23,27 +25,17 @@ export function WalletTracker({
   initialActivity: LiveActivityEvent[];
 }) {
   const [activeTab, setActiveTab] = useState<Tab>("OVERVIEW");
-  const [activity, setActivity] = useState<LiveActivityEvent[]>(initialActivity);
 
-  // Polling for live activity every 10 seconds if on ACTIVITY tab
-  useEffect(() => {
-    if (activeTab !== "ACTIVITY") return;
+  const [state, dispatch] = useReducer(walletReducer, {
+    openPositions: initialOpen,
+    closedPositions: initialClosed,
+    activity: initialActivity,
+    walletStats: stats,
+    connectionState: "RECONNECTING"
+  });
 
-    const fetchActivity = async () => {
-      try {
-        const res = await fetch(`/api/wallet/${walletAddress}/activity`);
-        if (res.ok) {
-          const data = await res.json();
-          setActivity(data);
-        }
-      } catch (err) {
-        console.error("Failed to fetch live activity", err);
-      }
-    };
-
-    const interval = setInterval(fetchActivity, 10000);
-    return () => clearInterval(interval);
-  }, [activeTab, walletAddress]);
+  // Setup Supabase Realtime
+  useWalletRealtime({ walletAddress, dispatch });
 
   const tabs: Tab[] = ["OVERVIEW", "OPEN", "CLOSED", "ACTIVITY"];
 
@@ -52,10 +44,29 @@ export function WalletTracker({
       
       {/* Header */}
       <div className="sticky top-0 z-10 bg-black/90 backdrop-blur border-b border-zinc-800 p-4">
-        <h1 className="text-xl font-bold mb-1 truncate text-[#00ff00]">
-          {walletAddress}
-        </h1>
-        <p className="text-zinc-500 text-xs">Pumpshot Wallet Tracker</p>
+        <div className="flex justify-between items-start">
+          <div>
+            <h1 className="text-xl font-bold mb-1 truncate text-[#00ff00]">
+              {walletAddress}
+            </h1>
+            <p className="text-zinc-500 text-xs">Pumpshot Wallet Tracker</p>
+          </div>
+          
+          <div className="flex items-center gap-2 mt-1">
+            <span className={`w-2 h-2 rounded-full ${
+              state.connectionState === "LIVE" ? "bg-[#00ff00] shadow-[0_0_8px_#00ff00]" : 
+              state.connectionState === "RECONNECTING" ? "bg-yellow-500 animate-pulse" : 
+              "bg-red-500"
+            }`}></span>
+            <span className={`text-[10px] ${
+              state.connectionState === "LIVE" ? "text-[#00ff00]" : 
+              state.connectionState === "RECONNECTING" ? "text-yellow-500" : 
+              "text-red-500"
+            }`}>
+              {state.connectionState}
+            </span>
+          </div>
+        </div>
         
         {/* Navigation */}
         <div className="flex gap-2 mt-4 overflow-x-auto no-scrollbar">
@@ -70,7 +81,7 @@ export function WalletTracker({
               }`}
             >
               {tab}
-              {tab === "OPEN" && ` (${stats.openPositionsCount})`}
+              {tab === "OPEN" && ` (${state.openPositions.length})`}
             </button>
           ))}
         </div>
@@ -81,45 +92,41 @@ export function WalletTracker({
         
         {activeTab === "OVERVIEW" && (
           <div className="grid grid-cols-2 gap-4">
-            <StatBox label="WIN RATE" value={`${stats.winRatePct.toFixed(1)}%`} highlight={stats.winRatePct >= 50} />
-            <StatBox label="TOTAL TRADES" value={stats.totalTrades.toString()} />
-            <StatBox label="REALIZED PNL" value={`${stats.realizedPnlSol > 0 ? '+' : ''}${stats.realizedPnlSol.toFixed(4)} SOL`} highlight={stats.realizedPnlSol > 0} error={stats.realizedPnlSol < 0} />
-            <StatBox label="BEST RETURN" value={stats.bestTradeReturnPct ? `${stats.bestTradeReturnPct.toFixed(0)}%` : "-"} highlight />
-            <StatBox label="OPEN POSITIONS" value={stats.openPositionsCount.toString()} />
-            <StatBox label="CLOSED POSITIONS" value={stats.closedPositionsCount.toString()} />
+            <StatBox label="WIN RATE" value={`${state.walletStats.winRatePct.toFixed(1)}%`} highlight={state.walletStats.winRatePct >= 50} />
+            <StatBox label="TOTAL TRADES" value={state.walletStats.totalTrades.toString()} />
+            <StatBox label="REALIZED PNL" value={`${state.walletStats.realizedPnlSol > 0 ? '+' : ''}${state.walletStats.realizedPnlSol.toFixed(4)} SOL`} highlight={state.walletStats.realizedPnlSol > 0} error={state.walletStats.realizedPnlSol < 0} />
+            <StatBox label="BEST RETURN" value={state.walletStats.bestTradeReturnPct ? `${state.walletStats.bestTradeReturnPct.toFixed(0)}%` : "-"} highlight />
+            <StatBox label="OPEN POSITIONS" value={state.openPositions.length.toString()} />
+            <StatBox label="CLOSED POSITIONS" value={state.closedPositions.length.toString()} />
           </div>
         )}
 
         {activeTab === "OPEN" && (
           <div className="flex flex-col gap-4">
-            {initialOpen.length === 0 ? (
+            {state.openPositions.length === 0 ? (
               <div className="text-zinc-500 text-center py-10">NO OPEN POSITIONS</div>
             ) : (
-              initialOpen.map(pos => <PositionCard key={pos.id} position={pos} />)
+              state.openPositions.map(pos => <PositionCard key={pos.id} position={pos} />)
             )}
           </div>
         )}
 
         {activeTab === "CLOSED" && (
           <div className="flex flex-col gap-4">
-            {initialClosed.length === 0 ? (
+            {state.closedPositions.length === 0 ? (
               <div className="text-zinc-500 text-center py-10">NO CLOSED POSITIONS</div>
             ) : (
-              initialClosed.map(pos => <PositionCard key={pos.id} position={pos} />)
+              state.closedPositions.map(pos => <PositionCard key={pos.id} position={pos} />)
             )}
           </div>
         )}
 
         {activeTab === "ACTIVITY" && (
           <div className="flex flex-col gap-2">
-            <div className="flex items-center gap-2 mb-2">
-               <span className="w-2 h-2 bg-[#00ff00] rounded-full animate-pulse"></span>
-               <span className="text-[#00ff00] text-xs">LIVE FEED POLLING</span>
-            </div>
-            {activity.length === 0 ? (
+            {state.activity.length === 0 ? (
               <div className="text-zinc-500 text-center py-10">NO RECENT ACTIVITY</div>
             ) : (
-              activity.map(event => (
+              state.activity.map(event => (
                 <div key={event.id} className="border border-zinc-800 p-3 bg-zinc-950 flex justify-between items-center">
                   <div className="flex flex-col">
                     <span className="text-xs text-zinc-500">
@@ -134,7 +141,7 @@ export function WalletTracker({
                       {" "} {Number(event.tokenAmount).toLocaleString()} TOKENS
                     </span>
                     <span className="text-xs text-zinc-400 mt-1 truncate max-w-[150px]">
-                      {event.position?.mint}
+                      {event.mint || event.position?.mint}
                     </span>
                   </div>
                   <div className="flex flex-col items-end">

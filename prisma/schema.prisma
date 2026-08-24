@@ -67,7 +67,10 @@ model WalletPosition {
 
 model PositionEvent {
   id                 String         @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  eventKey           String         @unique @map("event_key")
   positionId         String?        @map("position_id") @db.Uuid
+  walletAddress      String         @map("wallet_address")
+  mint               String
   signature          String
   slot               BigInt
   timestamp          DateTime       @db.Timestamptz(6)
@@ -92,6 +95,8 @@ model PositionEvent {
 
   @@index([positionId])
   @@index([signature])
+  @@index([walletAddress, timestamp])
+  @@index([walletAddress, mint, timestamp])
   @@map("position_events")
 }
 
@@ -102,4 +107,20 @@ model PumpshotCache {
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   @@map("pumpshot_cache")
+}
+
+model WebhookInbox {
+  id          String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  signature   String
+  source      String    @default("HELIUS")
+  payload     Json
+  status      String    @default("PENDING")
+  attempts    Int       @default(0)
+  receivedAt  DateTime  @default(now()) @map("received_at") @db.Timestamptz(6)
+  processedAt DateTime? @map("processed_at") @db.Timestamptz(6)
+  error       String?
+
+  @@unique([source, signature])
+  @@index([status, receivedAt])
+  @@map("webhook_inbox")
 }

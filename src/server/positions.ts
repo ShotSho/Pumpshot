@@ -612,3 +612,64 @@ export class PositionBook {
 
 /** A position without its fill ring. See `PositionBook.snapshot`. */
 export type StoredPosition = Omit<Position, "wallet" | "fills">;
+
+export function applyTradeEventToPosition(
+  position: any,
+  event: { isBuy: boolean; tokenAmount: number; quoteAmount: number; timestamp: number }
+) {
+  let {
+    totalTokensBought,
+    totalTokensSold,
+    remainingTokens,
+    totalSolSpent,
+    totalSolReceived,
+    status,
+    firstEntryAt,
+    lastActivityAt,
+    closedAt,
+  } = position;
+
+  // Convert Prisma.Decimal to numbers if needed, or just keep them as numbers if they are passed as raw JS objects.
+  // We'll assume they are numbers or can be coerced.
+  totalTokensBought = Number(totalTokensBought || 0);
+  totalTokensSold = Number(totalTokensSold || 0);
+  remainingTokens = Number(remainingTokens || 0);
+  totalSolSpent = Number(totalSolSpent || 0);
+  totalSolReceived = Number(totalSolReceived || 0);
+
+  if (event.isBuy) {
+    totalTokensBought += event.tokenAmount;
+    remainingTokens += event.tokenAmount;
+    totalSolSpent += event.quoteAmount;
+  } else {
+    totalTokensSold += event.tokenAmount;
+    remainingTokens -= event.tokenAmount;
+    totalSolReceived += event.quoteAmount;
+  }
+
+  // Dust threshold logic (e.g. remaining < 0.0001 of bought)
+  // or remaining <= 0 (accounting for precision errors)
+  if (remainingTokens <= 0 || (totalTokensBought > 0 && (remainingTokens / totalTokensBought) < 0.0001)) {
+    status = "CLOSED";
+    remainingTokens = 0; // snap to 0
+    closedAt = new Date(event.timestamp * 1000);
+  } else {
+    status = "OPEN";
+    closedAt = null;
+  }
+
+  lastActivityAt = new Date(event.timestamp * 1000);
+
+  return {
+    totalTokensBought,
+    totalTokensSold,
+    remainingTokens,
+    totalSolSpent,
+    totalSolReceived,
+    status,
+    lastActivityAt,
+    closedAt,
+    // Realized PnL approximation
+    realizedPnlSol: totalSolReceived - totalSolSpent + (remainingTokens > 0 ? (totalSolSpent * (remainingTokens/totalTokensBought)) : 0) // Naive PNL for MVP, actual history.ts uses exact FIFO cost basis
+  };
+}

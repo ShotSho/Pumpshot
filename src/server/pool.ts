@@ -108,7 +108,7 @@ export async function discoverVenues(mint: string): Promise<Venue[]> {
  * applied to every read in this app that wants trades.
  */
 export function tradeFilter(mint: string) {
-  return { status: "succeeded" as const };
+  return { status: "succeeded" as const, tokenTransfer: { mint } };
 }
 
 async function swapRate(

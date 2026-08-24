@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { reconstruct } from "@/server/history";
+import { processRealtimeTransaction, HeliusEnrichedTransaction } from "@/server/realtime/processHeliusTransaction";
 
 export const dynamic = "force-dynamic";
 
@@ -21,55 +21,45 @@ export async function POST(request: Request) {
       return new NextResponse("Invalid payload", { status: 400 });
     }
 
-    // 2. Extract unique (wallet, mint) pairs to update
-    const updatesNeeded = new Set<string>();
+    // 2. Queue into WebhookInbox and process incrementally
+    for (const tx of payload as HeliusEnrichedTransaction[]) {
+      if (!tx.signature) continue;
 
-    for (const tx of payload) {
-      if (!tx.tokenTransfers || tx.tokenTransfers.length === 0) continue;
-      
-      const involvedWallets = new Set<string>();
-      const involvedMints = new Set<string>();
-      
-      for (const transfer of tx.tokenTransfers) {
-        if (transfer.fromUserAccount) involvedWallets.add(transfer.fromUserAccount);
-        if (transfer.toUserAccount) involvedWallets.add(transfer.toUserAccount);
-        if (transfer.mint) involvedMints.add(transfer.mint);
+      // Dedupe in WebhookInbox
+      try {
+        await prisma.webhookInbox.create({
+          data: {
+            signature: tx.signature,
+            source: "HELIUS",
+            payload: tx as any,
+            status: "PROCESSING"
+          }
+        });
+      } catch (err) {
+        // If unique constraint fails, we already received this signature
+        continue;
       }
 
-      // We only care about wallets that we are currently tracking
-      for (const wallet of involvedWallets) {
-        for (const mint of involvedMints) {
-          updatesNeeded.add(`${wallet}|${mint}`);
-        }
+      try {
+        // Process it
+        await processRealtimeTransaction(tx);
+        
+        await prisma.webhookInbox.update({
+          where: {
+            source_signature: { source: "HELIUS", signature: tx.signature }
+          },
+          data: { status: "COMPLETED", processedAt: new Date() }
+        });
+      } catch (err) {
+        console.error(`[Webhook] Failed to process tx ${tx.signature}:`, err);
+        await prisma.webhookInbox.update({
+          where: {
+            source_signature: { source: "HELIUS", signature: tx.signature }
+          },
+          data: { status: "FAILED", error: (err as Error).message }
+        });
       }
     }
-
-    // 3. Fire and forget the sync process (background processing)
-    // We do not await this because we want to respond to Helius quickly.
-    const runUpdates = async () => {
-      for (const pair of updatesNeeded) {
-        const [wallet, mint] = pair.split("|");
-        
-        // Check if we actually track this wallet
-        const isTracked = await prisma.trackedWallet.findUnique({
-          where: { walletAddress: wallet },
-        });
-
-        if (isTracked && isTracked.trackingEnabled) {
-          try {
-            console.log(`[Webhook] Syncing ${wallet} on ${mint}`);
-            // This will pull the latest tx from Helius and run syncPositionBook internally
-            // Call reconstruct directly on the server side instead of the client-side fetch wrapper
-            await reconstruct(mint, wallet, 100, []);
-          } catch (err) {
-            console.error(`[Webhook] Failed to sync ${wallet} ${mint}:`, err);
-          }
-        }
-      }
-    };
-
-    // Execute asynchronously
-    runUpdates();
 
     return NextResponse.json({ success: true, message: "Webhook accepted" });
   } catch (error) {

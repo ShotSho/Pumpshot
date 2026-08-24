@@ -75,6 +75,9 @@ export async function syncPositionBook(mint: string, book: PositionBook): Promis
         if (!existing) {
           await prisma.positionEvent.create({
             data: {
+              eventKey: `${fill.signature}:${walletAddress}:${mint}`,
+              walletAddress,
+              mint,
               positionId: pos.id,
               signature: fill.signature,
               slot: BigInt(0), 
