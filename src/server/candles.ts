@@ -309,9 +309,6 @@ function toCandles(swaps: Swap[], from: number, to: number, interval: number): C
   for (let t = start; t < to; t += interval) {
     const held = buckets.get(t);
     if (!held || held.length === 0) {
-      // A period with nothing in it is a flat bar at the last price, which is
-      // what happened and what every chart draws. Before the first trade there
-      // is no price to draw, so nothing is emitted.
       if (last > 0) out.push({ t, o: last, h: last, l: last, c: last, v: 0, vb: 0, n: 0 });
       continue;
     }

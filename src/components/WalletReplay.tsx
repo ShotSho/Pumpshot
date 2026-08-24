@@ -853,10 +853,12 @@ export function WalletReplay({
     if (!a || !data || data.candles.length === 0) return;
     const total = data.candles.length;
 
-    const finished = (c: (typeof data.candles)[number]) =>
-      mode === "candles"
-        ? { time: c.t, open: c.o, high: c.h, low: c.l, close: c.c }
-        : { time: c.t, value: c.c };
+    const finished = (c: (typeof data.candles)[number]) => {
+      const empty = c.v === 0 ? { color: "transparent", borderColor: "transparent", wickColor: "transparent" } : {};
+      return mode === "candles"
+        ? { time: c.t, open: c.o, high: c.h, low: c.l, close: c.c, ...empty }
+        : { time: c.t, value: c.c, ...(c.v === 0 ? { color: "transparent" } : {}) };
+    };
 
     // Repaint the completed history only when it is not simply one step on.
     if (a.painted !== at - 1) {

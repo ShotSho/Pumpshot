@@ -387,12 +387,6 @@ export function HistoryReplay({
               onPlay={(w, n) => setPlaying({ wallet: w, label: n })}
             />
           </div>
-          {board?.truncated && (
-            <p className="mt-2 font-mono text-[10px] tracking-[0.1em] text-amber uppercase">
-              Top traders and worst traders list may be inaccurate — demo
-              purposes only
-            </p>
-          )}
         </>
       )}
     </>

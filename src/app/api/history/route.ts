@@ -58,17 +58,38 @@ export async function GET(request: Request) {
         { status: 404 },
       );
     }
-    if (!wallet) return NextResponse.json(history);
+    if (!wallet) {
+      return NextResponse.json({
+        ...history,
+        candles: history.candles.filter(c => c.n > 0),
+      });
+    }
 
     // The wallet's own window replaces the token-wide one, so the replay opens
     // on its trades rather than on the token's whole life.
     const replay = replayFrom(mint, wallet, history.candles, lead, alongside);
+    const finalCandles = replay?.candles ?? history.candles;
+    const finalPoints = replay?.points ?? [];
+
+    const filteredCandles = [];
+    const filteredPoints = [];
+
+    for (let i = 0; i < finalCandles.length; i++) {
+      // Keep only candles that actually had trades in them
+      if (finalCandles[i].n > 0) {
+        filteredCandles.push(finalCandles[i]);
+        if (finalPoints[i]) {
+          filteredPoints.push(finalPoints[i]);
+        }
+      }
+    }
+
     return NextResponse.json({
       ...history,
       wallet,
-      candles: replay?.candles ?? history.candles,
+      candles: filteredCandles,
       trades: replay?.trades ?? [],
-      points: replay?.points ?? [],
+      points: filteredPoints.length > 0 ? filteredPoints : undefined,
     });
   } catch (error) {
     return NextResponse.json(
