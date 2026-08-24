@@ -12,6 +12,11 @@ import {
   type TokenHistory,
 } from "@/lib/replay";
 import { useMintWalletRealtime } from "@/hooks/useMintWalletRealtime";
+import { createClient } from "@supabase/supabase-js";
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+const supabase = createClient(supabaseUrl, supabaseKey);
 import { usdCompact } from "@/lib/format";
 import { bestContainer, record, save } from "@/lib/record";
 import { captureTrack, play as playCue, prepare as prepareSound } from "@/lib/sound";
@@ -245,6 +250,59 @@ export function WalletReplay({
       });
     }
   });
+
+  // Phase C: Market Candles Realtime Stream
+  useEffect(() => {
+    if (!mint) return;
+
+    // 1. Send Ping to active_streams every 30 seconds
+    const pingStream = async () => {
+      try {
+        await fetch('/api/market/ping', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mint })
+        });
+      } catch (err) {
+        console.error('Failed to ping active_streams', err);
+      }
+    };
+
+    pingStream();
+    const interval = setInterval(pingStream, 30000);
+
+    // 2. Listen to live candles broadcast
+    const channel = supabase.channel(`market-candles-${mint}`)
+      .on(
+        'broadcast',
+        { event: 'candle_update' },
+        ({ payload }: { payload: any }) => {
+          if (payload.candle && api.current?.series) {
+            // Update Lightweight Charts
+            api.current.series.update(payload.candle);
+            
+            // Also update our raw data so zoom changes don't lose the live candles
+            setRaw((prev) => {
+              if (!prev) return prev;
+              const candles = [...prev.candles];
+              const last = candles[candles.length - 1];
+              if (last && last.t === payload.candle.t) {
+                candles[candles.length - 1] = payload.candle;
+              } else {
+                candles.push(payload.candle);
+              }
+              return { ...prev, candles };
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      clearInterval(interval);
+      supabase.removeChannel(channel);
+    };
+  }, [mint]);
 
   const [zoom, setZoom] = useState<number>(1);
   /**

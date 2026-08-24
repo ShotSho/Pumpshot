@@ -124,3 +124,11 @@ model WebhookInbox {
   @@index([status, receivedAt])
   @@map("webhook_inbox")
 }
+
+model ActiveStream {
+  mint         String   @id
+  lastPingAt   DateTime @map("last_ping_at") @db.Timestamptz(6)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("active_streams")
+}
