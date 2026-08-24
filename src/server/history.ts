@@ -1863,6 +1863,37 @@ export async function patchTraderBoard(mint: string, trader: PnlRow) {
     if (!state.candidates.includes(trader.wallet)) {
       state.candidates.push(trader.wallet);
     }
+    // Inject a StoredPosition so that rank() does not drop it on refresh
+    if (!state.positions) state.positions = {};
+    
+    // Look up the exact Position from the cached histories
+    const record = histories.get(`${mint}|${trader.wallet}`) ?? histories.get(`${mint}|`);
+    if (record) {
+      const pos = record.book.position(mint, trader.wallet);
+      if (pos) {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { wallet, fills, ...stored } = pos;
+        state.positions[trader.wallet] = stored;
+      }
+    } else if (!state.positions[trader.wallet]) {
+      // Fallback if not found in histories cache
+      state.positions[trader.wallet] = {
+        qty: trader.qty,
+        cash: trader.realized - trader.boughtUsd, // Approximation
+        costBasis: trader.boughtUsd, // Approximating
+        realized: trader.realized,
+        buys: trader.trades, // Approximating trades as buys
+        sells: 0,
+        boughtUsd: trader.boughtUsd,
+        boughtBase: 0,
+        soldUsd: trader.soldUsd,
+        soldBase: 0,
+        firstTs: Math.floor(Date.now() / 1000) - trader.heldSec,
+        lastTs: Math.floor(Date.now() / 1000),
+        unknownBase: 0,
+        unknownUsd: 0,
+      };
+    }
     await saveBlob(stateKey, state);
   }
 }

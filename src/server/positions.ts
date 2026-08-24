@@ -397,6 +397,11 @@ export class PositionBook {
     return p ? [...p.fills].sort((a, b) => a.ts - b.ts) : [];
   }
 
+  /** A wallet's own position on one token. */
+  position(mint: string, wallet: string): Position | undefined {
+    return this.byMint.get(mint)?.get(wallet);
+  }
+
   replay(
     mint: string,
     wallet: string,
