@@ -155,6 +155,22 @@ export function HistoryReplay({
 
   return (
     <>
+      {loading && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-ink-950/80 backdrop-blur-sm transition-all duration-300">
+          <div className="flex flex-col items-center gap-5 p-6 md:p-8">
+            <div className="h-10 w-10 animate-spin rounded-full border-[3px] border-amber/20 border-t-amber shadow-[0_0_15px_rgba(251,191,36,0.3)]"></div>
+            <div className="flex flex-col items-center gap-2">
+              <h3 className="font-mono text-[13px] font-semibold tracking-[0.2em] text-amber uppercase">
+                Building Token
+              </h3>
+              <p className="max-w-[280px] text-center font-mono text-[11px] leading-relaxed text-tx3">
+                Finding the busiest pool, then reading windows across the token&rsquo;s whole life. About ten seconds the first time, then it&rsquo;s cached.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/*
         The header lives here rather than in the page so the wordmark can clear
         the open token. A link to `/` cannot: it is the same route, so the state
@@ -243,13 +259,7 @@ export function HistoryReplay({
           </button>
         </form>
 
-        {loading && (
-          <p className="mt-4 border-t border-line pt-3 font-mono text-[11px] text-tx3">
-            Finding the busiest pool, then reading windows across the
-            token&rsquo;s whole life. About ten seconds the first time, then
-            it&rsquo;s cached.
-          </p>
-        )}
+
         {history?.error && (
           <p className="mt-4 border-t border-line pt-3 font-mono text-[11px] text-signal">
             {history.error}
@@ -258,14 +268,9 @@ export function HistoryReplay({
       </Panel>
       )}
 
-      {readOnly && (loading || history?.error) && (
+      {readOnly && history?.error && (
         <Panel className="p-4">
-          {loading && (
-            <p className="font-mono text-[11px] text-tx3">Loading.</p>
-          )}
-          {history?.error && (
-            <p className="font-mono text-[11px] text-signal">{history.error}</p>
-          )}
+          <p className="font-mono text-[11px] text-signal">{history.error}</p>
         </Panel>
       )}
 

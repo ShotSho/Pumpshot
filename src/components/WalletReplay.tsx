@@ -763,14 +763,17 @@ export function WalletReplay({
     if (!bar) return;
 
     const iv = data.interval;
-    const sold = data.trades.some(
+    const sellsInBar = data.trades.filter(
       (t) =>
         t.kind !== "transfer" &&
         !t.isBuy &&
         t.usd > 0 &&
         Math.floor(t.ts / iv) * iv === bar.t,
     );
-    if (sold) playCue("kaching");
+    // Stagger them slightly if there are many in one bar to avoid deafening spikes
+    sellsInBar.forEach((_, i) => {
+      setTimeout(() => playCue("kaching"), i * 150);
+    });
 
     /**
      * Once per $20K gained. A bar that leaps several steps at once still
@@ -779,8 +782,11 @@ export function WalletReplay({
      */
     const total = data.points[at]?.total ?? 0;
     const reached = Math.floor(total / FANFARE_AT);
-    if (at === 0) tier.current = Math.max(reached, 0);
-    else if (reached > tier.current) {
+    
+    // If we rewind or seek backwards, re-arm the fanfare threshold
+    if (at === 0 || (atRef.current !== undefined && at < atRef.current)) {
+      tier.current = Math.max(reached, 0);
+    } else if (reached > tier.current) {
       tier.current = reached;
       playCue("bandos");
     }

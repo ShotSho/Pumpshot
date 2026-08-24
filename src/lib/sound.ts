@@ -15,8 +15,7 @@ export type Cue = "kaching" | "bandos";
 
 const FILES: Record<Cue, string> = {
   kaching: "/sfx/kaching.mp3",
-  /** QuickTime container, audio only — decoded by the platform, not the tag. */
-  bandos: "/sfx/bandos.mov",
+  bandos: "/sfx/bandos.mp3",
 };
 
 let ctx: AudioContext | null = null;
