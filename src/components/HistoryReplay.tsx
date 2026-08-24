@@ -86,8 +86,51 @@ export function HistoryReplay({
     !q ||
     r.wallet.toLowerCase().includes(q) ||
     (r.name ?? "").toLowerCase().includes(q);
-  const top = (board?.top ?? []).filter(keep);
-  const bottom = (board?.bottom ?? []).filter(keep);
+  let searchedTrader: HistoryTrader | null = null;
+  if (history?.wallet && history.points?.length) {
+    const lastPoint = history.points[history.points.length - 1];
+    const trades = history.trades ?? [];
+    const firstTrade = trades[0];
+    const lastTrade = trades[trades.length - 1];
+    let heldSec: number | undefined;
+    if (firstTrade && lastTrade) {
+       heldSec = lastPoint.qty > 0 ? Math.floor(Date.now() / 1000) - firstTrade.ts : lastTrade.ts - firstTrade.ts;
+    }
+    
+    searchedTrader = {
+      wallet: history.wallet,
+      name: history.walletName,
+      total: lastPoint.total,
+      realized: lastPoint.realized,
+      unrealized: lastPoint.unrealized,
+      boughtUsd: lastPoint.boughtUsd,
+      soldUsd: lastPoint.soldUsd,
+      trades: trades.length,
+      qty: lastPoint.qty,
+      heldSec
+    };
+  }
+
+  const baseTop = board?.top ?? [];
+  const baseBottom = board?.bottom ?? [];
+
+  let allTop = [...baseTop];
+  let allBottom = [...baseBottom];
+
+  if (searchedTrader) {
+    const inTop = allTop.some(t => t.wallet === searchedTrader!.wallet);
+    const inBottom = allBottom.some(t => t.wallet === searchedTrader!.wallet);
+    if (!inTop && !inBottom) {
+      if (searchedTrader.total >= 0) {
+        allTop.unshift(searchedTrader);
+      } else {
+        allBottom.unshift(searchedTrader);
+      }
+    }
+  }
+
+  const top = allTop.filter(keep);
+  const bottom = allBottom.filter(keep);
   const found = top.length + bottom.length;
 
   /**
