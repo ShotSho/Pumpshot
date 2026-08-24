@@ -329,6 +329,22 @@ export async function scanHolders(
     .slice(0, limit * 3);
 
   const split = splitPools(ranked);
+  
+  // Find early pools (like pump.fun bonding curves) that might have 0 balance now.
+  const earlyPools = await findEarlyPools(mint);
+  const knownPools = new Set(split.pools.map((p) => p.pool));
+  for (const p of earlyPools) {
+    if (!knownPools.has(p)) {
+      split.pools.unshift({ pool: p, amount: 0 });
+    } else {
+      const idx = split.pools.findIndex((pool) => pool.pool === p);
+      if (idx > -1) {
+        const [poolItem] = split.pools.splice(idx, 1);
+        if (poolItem) split.pools.unshift(poolItem);
+      }
+    }
+  }
+
   return { holders: split.wallets.slice(0, limit), pools: split.pools };
 }
 
@@ -363,4 +379,38 @@ function splitPools(holders: { owner: string; amount: number }[]): {
  */
 export function programOwned(addresses: string[]): Set<string> {
   return new Set(addresses.filter((a) => a && isProgramDerived(a)));
+}
+
+/**
+ * Find pools from the very first transactions of a token.
+ * This catches pump.fun bonding curves after they migrate to Raydium and their balance drops to 0.
+ */
+async function findEarlyPools(mint: string): Promise<string[]> {
+  const res = await rpc<{ data?: any[] }>("getTransactionsForAddress", [
+    mint,
+    {
+      transactionDetails: "full",
+      sortOrder: "asc",
+      limit: 100, // Look at the first 100 trades to find all initial pools
+      maxSupportedTransactionVersion: 0,
+      filters: tradeFilter(mint),
+    }
+  ]);
+  
+  const txs = res?.data ?? [];
+  const pools = new Set<string>();
+  
+  for (const tx of txs) {
+    const keys = accountKeys(tx);
+    const post = tx.meta?.postTokenBalances ?? [];
+    for (const b of post) {
+      if (b.mint === mint) {
+         const address = keys[b.accountIndex];
+         if (address && isProgramDerived(address)) {
+            pools.add(address);
+         }
+      }
+    }
+  }
+  return [...pools];
 }
