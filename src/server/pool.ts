@@ -108,7 +108,7 @@ export async function discoverVenues(mint: string): Promise<Venue[]> {
  * applied to every read in this app that wants trades.
  */
 export function tradeFilter(mint: string) {
-  return { status: "succeeded" as const, tokenTransfer: { mint } };
+  return { status: "succeeded" as const };
 }
 
 async function swapRate(
@@ -122,7 +122,7 @@ async function swapRate(
       {
         transactionDetails: "signatures",
         sortOrder: "desc",
-        limit: 1_000,
+        limit: 100,
         maxSupportedTransactionVersion: 0,
         filters: tradeFilter(mint),
       },
@@ -150,9 +150,10 @@ export async function pickVenue(mint: string): Promise<Venue | null> {
   const venues = await discoverVenues(mint);
   if (venues.length === 0) return null;
 
-  const ranked = await Promise.all(
-    venues.map(async (v) => ({ ...v, rate: (await swapRate(v.pool, mint)).rate })),
-  );
+  const ranked = [];
+  for (const v of venues) {
+    ranked.push({ ...v, rate: (await swapRate(v.pool, mint)).rate });
+  }
   ranked.sort((a, b) => b.rate - a.rate);
   const best = ranked[0];
   if (!best || best.rate === 0) return null;

@@ -117,7 +117,7 @@ export function HistoryReplay({
             title="Back to all tokens"
             className="cursor-pointer font-display text-[34px] leading-none font-semibold tracking-[-0.025em] text-tx transition-colors hover:text-tx2"
           >
-            <h1>Pumpshot</h1>
+            <img src="/logo.png" alt="Pumpshot" className="h-[34px] w-auto object-contain" />
           </button>
         </div>
         <p className="mt-2.5 max-w-[62ch] text-[14.5px] leading-relaxed text-tx2">
