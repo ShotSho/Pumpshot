@@ -25,18 +25,19 @@ export async function POST(request: Request) {
     for (const tx of payload as HeliusEnrichedTransaction[]) {
       if (!tx.signature) continue;
 
-      // Dedupe in WebhookInbox
-      try {
-        await prisma.webhookInbox.create({
-          data: {
-            signature: tx.signature,
-            source: "HELIUS",
-            payload: tx as any,
-            status: "PROCESSING"
-          }
-        });
-      } catch (err) {
-        // If unique constraint fails, we already received this signature
+      // Dedupe in WebhookInbox without throwing prisma errors in logs
+      const inserted = await prisma.webhookInbox.createMany({
+        data: [{
+          signature: tx.signature,
+          source: "HELIUS",
+          payload: tx as any,
+          status: "PROCESSING"
+        }],
+        skipDuplicates: true
+      });
+      
+      if (inserted.count === 0) {
+        // If count is 0, we already received this signature
         continue;
       }
 
