@@ -182,10 +182,22 @@ export function HistoryReplay({
             type="button"
             onClick={back}
             title="Back to all tokens"
-            className="cursor-pointer font-display text-[34px] leading-none font-semibold tracking-[-0.025em] text-tx transition-colors hover:text-tx2"
+            className="flex items-center gap-2 cursor-pointer font-display text-[34px] leading-none font-semibold tracking-[-0.025em] text-tx transition-colors hover:text-tx2"
           >
-            <img src="/logo.png" alt="Pumpshot" className="h-[34px] w-auto object-contain" />
+            <img src="/logo.png" alt="Pumpshot Logo" className="h-[34px] w-auto object-contain" />
+            <span>PumpShot</span>
           </button>
+          {process.env.NEXT_PUBLIC_CA && (
+            <a
+              href={`https://pump.fun/${process.env.NEXT_PUBLIC_CA}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="ml-2 rounded-full border border-zinc-700/50 bg-surface-2 px-3 py-1 font-mono text-[13px] text-tx2 transition-colors hover:border-zinc-500 hover:text-tx"
+              title="View on pump.fun"
+            >
+              CA: {process.env.NEXT_PUBLIC_CA}
+            </a>
+          )}
         </div>
         <p className="mt-2.5 max-w-[62ch] text-[14.5px] leading-relaxed text-tx2">
           {readOnly
