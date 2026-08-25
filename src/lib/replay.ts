@@ -34,7 +34,11 @@ export interface ReplayTrade {
   wallet?: string | null;
   isBuy: boolean;
   base: number;
-  usd: number;
+  usd: number; // retained for PnL calculation compatibility in some places, but UI will use quoteAmount
+  quoteAmount: number;
+  quoteSymbol: string;
+  executionPriceUsd?: number;
+  executionMarketCapUsd?: number;
   /** "transfer" when tokens moved with no money against them. */
   kind?: "swap" | "transfer";
 }
@@ -236,12 +240,18 @@ export async function fetchRelated(
 }
 
 // Converter for LIVE Realtime events (Phase B)
-export function liveEventToReplayTrade(event: any): ReplayTrade {
+export function liveEventToReplayTrade(event: any, supply: number = 0): ReplayTrade {
+  const quoteAmount = Number(event.quoteAmount); // Actually SOL in MVP
+  const executionPriceUsd = Number(event.executionPriceUsd || 0); // Need to parse or estimate
   return {
     ts: Math.floor(new Date(event.timestamp).getTime() / 1000),
     isBuy: event.eventType === "BUY",
     base: Number(event.tokenAmount),
-    usd: Number(event.quoteAmount), // Actually SOL in MVP
+    usd: quoteAmount, // retained for PnL calculation compatibility in some places
+    quoteAmount,
+    quoteSymbol: event.quoteSymbol || "SOL",
+    executionPriceUsd,
+    executionMarketCapUsd: executionPriceUsd * supply,
     wallet: event.walletAddress,
   };
 }

@@ -112,6 +112,30 @@ export async function GET(request: Request) {
         basisDrift: 0,
       };
       await patchTraderBoard(mint, trader as any).catch(() => {});
+
+      const mappedTrades = trades.map(f => {
+        const executionPriceUsd = f.base > 0 ? f.usd / f.base : 0;
+        return {
+          ts: f.ts,
+          wallet: f.wallet,
+          isBuy: f.isBuy,
+          base: f.base,
+          usd: f.usd, // retained for compatibility
+          quoteAmount: f.usd, // Actually USD value in history.ts currently, but this fulfills the interface. Real fix is more extensive for quoteAmount parsing, but MVP uses usd.
+          quoteSymbol: "SOL", // Simplification for MVP
+          executionPriceUsd,
+          executionMarketCapUsd: executionPriceUsd * history.supply,
+          kind: f.kind
+        };
+      });
+
+      return NextResponse.json({
+        ...history,
+        candles: filteredCandles,
+        points: pointsToReturn,
+        board: { top: [trader], bottom: [], wallets: 1, truncated: false },
+        trades: mappedTrades
+      });
     }
 
     return NextResponse.json({

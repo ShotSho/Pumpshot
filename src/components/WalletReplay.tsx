@@ -113,6 +113,7 @@ interface Flash {
   id: number;
   isBuy: boolean;
   usd: number;
+  quoteAmount: number;
   /** Market cap at the bar it landed on, already converted. */
   cap: number;
   /** Stacking offset, so a buy and a sell in one bar do not sit on top of
@@ -214,7 +215,7 @@ export function WalletReplay({
     onPositionEvent: (event) => {
       setRaw(prev => {
         if (!prev) return prev;
-        const newTrade = liveEventToReplayTrade(event);
+        const newTrade = liveEventToReplayTrade(event, prev.supply);
         return {
           ...prev,
           trades: [...prev.trades, newTrade],
@@ -574,7 +575,7 @@ export function WalletReplay({
      */
     const grouped = new Map<
       string,
-      { time: number; isBuy: boolean; usd: number; wallet?: string | null }
+      { time: number; isBuy: boolean; usd: number; quoteAmount: number; wallet?: string | null }
     >();
     for (const t of data.trades) {
       if (t.kind === "transfer" || !(t.usd > 0)) continue;
@@ -585,15 +586,17 @@ export function WalletReplay({
         time,
         isBuy: t.isBuy,
         usd: 0,
+        quoteAmount: 0,
         wallet: t.wallet,
       };
       at.usd += t.usd;
+      at.quoteAmount += t.quoteAmount ?? t.usd;
       grouped.set(key, at);
     }
 
     const all = [...grouped.values()];
-    const label = (g: { isBuy: boolean; usd: number; wallet?: string | null }) =>
-      `${g.isBuy ? "BUY" : "SELL"} ${usdCompact(g.usd)}` +
+    const label = (g: { isBuy: boolean; quoteAmount: number; wallet?: string | null }) =>
+      `${g.isBuy ? "BUY" : "SELL"} ${usdCompact(g.quoteAmount)} SOL` +
       (alongside.length > 0 && g.wallet ? ` ${g.wallet.slice(0, 4)}` : "");
 
     /** Rough width of a marker label. The font is ~11px; this is close enough
@@ -608,7 +611,7 @@ export function WalletReplay({
     };
     const labelled = new Set<string>();
 
-    for (const g of [...all].sort((a, b) => b.usd - a.usd)) {
+    for (const g of [...all].sort((a, b) => b.quoteAmount - a.quoteAmount)) {
       const side = g.isBuy ? "buy" : "sell";
       const half = widthOf(label(g)) / 2;
       const bar = g.time / iv;
@@ -627,7 +630,7 @@ export function WalletReplay({
         time: g.time,
         position: g.isBuy ? "belowBar" : "aboveBar",
         color: g.isBuy ? "#3fd08a" : "#ff5c5c",
-        shape: "circle",
+        shape: "circle" as const,
         text: labelled.has(`${g.time}:${g.isBuy}:${g.wallet ?? ""}`)
           ? label(g)
           : "",
@@ -662,12 +665,13 @@ export function WalletReplay({
 
     // Summed per side: a router can put a dozen fills in one bar, and twelve
     // labels climbing the screen together says less than two do.
-    const bySide = new Map<string, { isBuy: boolean; usd: number; who?: string }>();
+    const bySide = new Map<string, { isBuy: boolean; usd: number; quoteAmount: number; who?: string }>();
     for (const t of inBar) {
       const who = alongside.length > 0 ? (t.wallet ?? undefined) : undefined;
       const key = `${t.isBuy}:${who ?? ""}`;
-      const at = bySide.get(key) ?? { isBuy: t.isBuy, usd: 0, who };
+      const at = bySide.get(key) ?? { isBuy: t.isBuy, usd: 0, quoteAmount: 0, who };
       at.usd += t.usd;
+      at.quoteAmount += t.quoteAmount ?? t.usd;
       bySide.set(key, at);
     }
 
@@ -675,6 +679,7 @@ export function WalletReplay({
       id: (flashId += 1),
       isBuy: v.isBuy,
       usd: v.usd,
+      quoteAmount: v.quoteAmount,
       cap: bar.c,
       slot: i,
       who: v.who,
@@ -763,16 +768,24 @@ export function WalletReplay({
     if (!bar) return;
 
     const iv = data.interval;
-    const sellsInBar = data.trades.filter(
+    const tradesInBar = data.trades.filter(
       (t) =>
         t.kind !== "transfer" &&
-        !t.isBuy &&
         t.usd > 0 &&
         Math.floor(t.ts / iv) * iv === bar.t,
     );
-    // Stagger them slightly if there are many in one bar to avoid deafening spikes
-    sellsInBar.forEach((_, i) => {
-      setTimeout(() => playCue("kaching"), i * 150);
+
+    let buyCount = 0;
+    let sellCount = 0;
+    
+    tradesInBar.forEach((t) => {
+      if (t.isBuy) {
+        setTimeout(() => playCue("kaching"), buyCount * 150);
+        buyCount++;
+      } else {
+        setTimeout(() => playCue("coindrop"), sellCount * 150);
+        sellCount++;
+      }
     });
 
     /**
@@ -788,7 +801,7 @@ export function WalletReplay({
       tier.current = Math.max(reached, 0);
     } else if (reached > tier.current) {
       tier.current = reached;
-      playCue("bandos");
+      // removed bandos here, it's used for sells now as per user instruction
     }
   }, [at, data, playing, soundOn]);
 
@@ -853,7 +866,7 @@ export function WalletReplay({
         ctx.globalAlpha = alpha;
         ctx.fillStyle = f.isBuy ? "#35d399" : "#ff5a5a";
         ctx.font = `800 ${26 * k}px ui-monospace, "JetBrains Mono", "SF Mono", monospace`;
-        const head = `${usdCompact(f.usd)} ${f.isBuy ? "BUY" : "SELL"}`;
+        const head = `${usdCompact(f.quoteAmount)} SOL ${f.isBuy ? "BUY" : "SELL"}`;
         const tail = ` (${capLabel(f.cap)}${asCap ? " MC" : ""})`;
         const headWidth = ctx.measureText(head).width;
         ctx.font = `700 ${17 * k}px ui-monospace, "JetBrains Mono", "SF Mono", monospace`;

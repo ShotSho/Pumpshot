@@ -11,11 +11,11 @@
  * to start audio at all, should cost the sound and nothing else.
  */
 
-export type Cue = "kaching" | "bandos";
+export type Cue = "kaching" | "coindrop";
 
 const FILES: Record<Cue, string> = {
   kaching: "/sfx/kaching.mp3",
-  bandos: "/sfx/bandos.mp3",
+  coindrop: "/sfx/coin-drop.mp3",
 };
 
 let ctx: AudioContext | null = null;

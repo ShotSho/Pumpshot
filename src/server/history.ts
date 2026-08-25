@@ -590,8 +590,15 @@ async function tokenSupply(mint: string): Promise<number> {
     "getTokenSupply",
     [mint],
   );
-  const amount = Number(res?.value?.amount ?? 0);
-  const decimals = res?.value?.decimals ?? 6;
+  let amount = Number(res?.value?.amount ?? 0);
+  let decimals = res?.value?.decimals ?? 6;
+
+  // Pump.fun verified fallback if RPC lookup fails
+  if (amount === 0 && mint.endsWith("pump")) {
+    amount = 1_000_000_000 * (10 ** 6);
+    decimals = 6;
+  }
+
   return amount > 0 ? amount / 10 ** decimals : 0;
 }
 
